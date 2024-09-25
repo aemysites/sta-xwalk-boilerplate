@@ -178,8 +178,7 @@
                 "template": {
                   "name": "Table",
                   "model": "table",
-                  "filter": "table",
-                  "columns":1
+                  "filter": "table"
                 }
               }
             }
