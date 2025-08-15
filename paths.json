@@ -1,10 +1,11 @@
 {
   "mappings": [
-    "/content/aem-boilerplate/:/",
-    "/content/aem-boilerplate/configuration:/.helix/config.json",
-    "/content/aem-boilerplate/metadata:/metadata.json"
+    "/content/sta-xwalk-boilerplate/:/",
+    "/content/sta-xwalk-boilerplate/configuration:/.helix/config.json",
+    "/content/sta-xwalk-boilerplate/metadata:/metadata.json",
+    "/content/sta-xwalk-boilerplate/tools/sidekick/library:/tools/sidekick/library.json"
   ],
   "includes": [
-    "/content/aem-boilerplate/"
+    "/content/sta-xwalk-boilerplate/"
   ]
 }
