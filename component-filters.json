@@ -14,12 +14,17 @@
       "title",
       "hero",
       "cards",
+      "carousel",
       "columns",
       "fragment",
       "accordion",
-      "tabs",
       "embed",
-      "quote"
+      "quote",
+      "search",
+      "table",
+      "video",
+      "tab-list",
+      "library-metadata"
     ]
   },
   {
@@ -54,6 +59,10 @@
       "button",
       "title"
     ]
+  },
+  {
+    "id": "library-metadata",
+    "components": []
   },
   {
     "id": "table",
