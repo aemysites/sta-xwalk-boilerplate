@@ -3,7 +3,6 @@ import {
   loadFooter,
   decorateButtons,
   decorateIcons,
-  decorateLinkedPictures,
   decorateSections,
   decorateBlocks,
   decorateTemplateAndTheme,
@@ -26,7 +25,7 @@ export function moveAttributes(from, to, attributes) {
   attributes.forEach((attr) => {
     const value = from.getAttribute(attr);
     if (value) {
-      to.setAttribute(attr, value);
+      to?.setAttribute(attr, value);
       from.removeAttribute(attr);
     }
   });
@@ -81,7 +80,6 @@ export function decorateMain(main) {
   // hopefully forward compatible button decoration
   decorateButtons(main);
   decorateIcons(main);
-  decorateLinkedPictures(main);
   buildAutoBlocks(main);
   decorateSections(main);
   decorateBlocks(main);
@@ -147,19 +145,3 @@ async function loadPage() {
 }
 
 loadPage();
-
-const { searchParams, origin } = new URL(window.location.href);
-const branch = searchParams.get('nx') || 'main';
-
-export const NX_ORIGIN = branch === 'local' || origin.includes('localhost') ? 'http://localhost:6456/nx' : 'https://da.live/nx';
-
-(async function loadDa() {
-  /* eslint-disable import/no-unresolved */
-  if (searchParams.get('dapreview')) {
-    import('https://da.live/scripts/dapreview.js')
-      .then(({ default: daPreview }) => daPreview(loadPage));
-  }
-  if (searchParams.get('daexperiment')) {
-    import(`${NX_ORIGIN}/public/plugins/exp/exp.js`);
-  }
-}());
