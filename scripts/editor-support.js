@@ -6,24 +6,11 @@ import {
   decorateIcons,
   decorateSections,
   loadBlock,
+  loadScript,
   loadSections,
 } from './aem.js';
 import { decorateRichtext } from './editor-support-rte.js';
 import { decorateMain } from './scripts.js';
-
-/**
- *
- * @param {Element} block
- * @param {HTMLElement} block
- * Use this function to trigger a mutation for the UI editor overlay when you
- * have a scrollable block
- */
-function createMutation(block) {
-  block.setAttribute('xwalk-scroll-mutation', 'true');
-  block.querySelector('.carousel-slides').onscrollend = () => {
-    block.removeAttribute('xwalk-scroll-mutation');
-  };
-}
 
 function getState(block) {
   if (block.matches('.accordion')) {
@@ -45,14 +32,14 @@ function setState(block, state) {
   }
   if (block.matches('.carousel')) {
     block.style.display = null;
-    createMutation(block);
-    showSlide(block, state);
+    showSlide(block, state, 'instant');
   }
 }
 
 async function applyChanges(event) {
   // redecorate default content and blocks on patches (in the properties rail)
   const { detail } = event;
+
   const resource = detail?.request?.target?.resource // update, patch components
     || detail?.request?.target?.container?.resource // update, patch, add to sections
     || detail?.request?.to?.container?.resource; // move in sections
@@ -62,7 +49,11 @@ async function applyChanges(event) {
   const { content } = updates[0];
   if (!content) return false;
 
-  const parsedUpdate = new DOMParser().parseFromString(content, 'text/html');
+  // load dompurify
+  await loadScript(`${window.hlx.codeBasePath}/scripts/dompurify.min.js`);
+
+  const sanitizedContent = window.DOMPurify.sanitize(content, { USE_PROFILES: { html: true } });
+  const parsedUpdate = new DOMParser().parseFromString(sanitizedContent, 'text/html');
   const element = document.querySelector(`[data-aue-resource="${resource}"]`);
 
   if (element) {
@@ -79,9 +70,7 @@ async function applyChanges(event) {
       attachEventListners(newMain);
       return true;
     }
-    if (element.matches('.fragment-wrapper')) {
-      return false;
-    }
+
     const block = element.parentElement?.closest('.block[data-aue-resource]') || element?.closest('.block[data-aue-resource]');
     if (block) {
       const state = getState(block);
@@ -102,9 +91,7 @@ async function applyChanges(event) {
       }
     } else {
       // sections and default content, may be multiple in the case of richtext
-      const newElements = parsedUpdate.querySelectorAll(
-        `[data-aue-resource="${resource}"],[data-richtext-resource="${resource}"]`,
-      );
+      const newElements = parsedUpdate.querySelectorAll(`[data-aue-resource="${resource}"],[data-richtext-resource="${resource}"]`);
       if (newElements.length) {
         const { parentElement } = element;
         if (element.matches('.section')) {
@@ -152,8 +139,12 @@ function handleSelection(event) {
     }
 
     if (block && block.matches('.carousel')) {
-      createMutation(block);
+      const slideIndex = [...block.querySelectorAll('.carousel-slide')].findIndex((slide) => slide === element);
+      if (slideIndex !== -1) {
+        showSlide(block, slideIndex, 'instant');
+      }
     }
+
     if (block && block.matches('.tabs')) {
       const tabs = [...block.querySelectorAll('.tabs-panel > div')];
       const index = tabs.findIndex((tab) => tab.dataset.aueResource === resource);
@@ -171,6 +162,7 @@ function attachEventListners(main) {
     'aue:content-add',
     'aue:content-move',
     'aue:content-remove',
+    'aue:content-copy',
   ].forEach((eventType) => main?.addEventListener(eventType, async (event) => {
     event.stopPropagation();
     const applied = await applyChanges(event);
@@ -181,3 +173,11 @@ function attachEventListners(main) {
 }
 
 attachEventListners(document.querySelector('main'));
+
+// decorate rich text
+// this has to happen after decorateMain(), and everythime decorateBlocks() is called
+decorateRichtext();
+// in cases where the block decoration is not done in one synchronous iteration we need to listen
+// for new richtext-instrumented elements. this happens for example when using experimentation.
+const observer = new MutationObserver(() => decorateRichtext());
+observer.observe(document, { attributeFilter: ['data-richtext-prop'], subtree: true });

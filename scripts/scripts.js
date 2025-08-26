@@ -11,7 +11,6 @@ import {
   loadSection,
   loadSections,
   loadCSS,
-  sampleRUM,
 } from './aem.js';
 
 /**
@@ -84,6 +83,18 @@ function buildAutoBlocks() {
   }
 }
 
+function a11yLinks(main) {
+  const links = main.querySelectorAll('a');
+  links.forEach((link) => {
+    let label = link.textContent;
+    if (!label && link.querySelector('span.icon')) {
+      const icon = link.querySelector('span.icon');
+      label = icon ? icon.classList[1]?.split('-')[1] : label;
+    }
+    link.setAttribute('aria-label', label);
+  });
+}
+
 /**
  * Decorates the main element.
  * @param {Element} main The main element
@@ -96,6 +107,8 @@ export function decorateMain(main) {
   buildAutoBlocks(main);
   decorateSections(main);
   decorateBlocks(main);
+  // add aria-label to links
+  a11yLinks(main);
 }
 
 /**
@@ -103,7 +116,7 @@ export function decorateMain(main) {
  * @param {Element} doc The container element
  */
 async function loadEager(doc) {
-  doc.documentElement.lang = 'en';
+  document.documentElement.lang = 'en';
   decorateTemplateAndTheme();
   if (getMetadata('breadcrumbs').toLowerCase() === 'true') {
     doc.body.dataset.breadcrumbs = true;
@@ -111,11 +124,9 @@ async function loadEager(doc) {
   const main = doc.querySelector('main');
   if (main) {
     decorateMain(main);
-    doc.body.classList.add('appear');
+    document.body.classList.add('appear');
     await loadSection(main.querySelector('.section'), waitForFirstImage);
   }
-
-  sampleRUM.enhance();
 
   try {
     /* if desktop (proxy for fast connection) or fonts already loaded, load fonts.css */
@@ -156,7 +167,6 @@ function loadDelayed() {
   // eslint-disable-next-line import/no-cycle
   window.setTimeout(() => import('./delayed.js'), 3000);
   // load anything that can be postponed to the latest here
-  import('./sidekick.js').then(({ initSidekick }) => initSidekick());
 }
 
 async function loadPage() {
