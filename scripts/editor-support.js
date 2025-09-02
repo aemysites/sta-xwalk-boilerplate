@@ -12,20 +12,6 @@ import {
 import { decorateRichtext } from './editor-support-rte.js';
 import { decorateMain } from './scripts.js';
 
-/**
- *
- * @param {Element} block
- * @param {HTMLElement} block
- * Use this function to trigger a mutation for the UI editor overlay when you
- * have a scrollable block
- */
-function createMutation(block) {
-  block.setAttribute('xwalk-scroll-mutation', 'true');
-  block.querySelector('.carousel-slides').onscrollend = () => {
-    block.removeAttribute('xwalk-scroll-mutation');
-  };
-}
-
 function getState(block) {
   if (block.matches('.accordion')) {
     return [...block.querySelectorAll('details[open]')].map(
@@ -35,6 +21,11 @@ function getState(block) {
   if (block.matches('.carousel')) {
     return block.dataset.activeSlide;
   }
+  if (block.matches('.tabs')) {
+    const [currentPanel] = block.querySelectorAll('.tabs-panel[aria-hidden="false"]');
+    return currentPanel?.dataset.aueResource;
+  }
+
   return null;
 }
 
@@ -46,8 +37,14 @@ function setState(block, state) {
   }
   if (block.matches('.carousel')) {
     block.style.display = null;
-    createMutation(block);
-    showSlide(block, state);
+    showSlide(block, state, 'instant');
+  }
+  if (block.matches('.tabs')) {
+    const tabs = [...block.querySelectorAll('.tabs-panel')];
+    const index = tabs.findIndex((tab) => tab.dataset.aueResource === state);
+    if (index !== -1) {
+      block.querySelectorAll('.tabs-list button')[index]?.click();
+    }
   }
 }
 
@@ -88,10 +85,10 @@ async function applyChanges(event) {
 
     const block = element.parentElement?.closest('.block[data-aue-resource]') || element?.closest('.block[data-aue-resource]');
     if (block) {
+      const state = getState(block);
       const blockResource = block.getAttribute('data-aue-resource');
       const newBlock = parsedUpdate.querySelector(`[data-aue-resource="${blockResource}"]`);
       if (newBlock) {
-        const state = getState(block);
         newBlock.style.display = 'none';
         block.insertAdjacentElement('afterend', newBlock);
         decorateButtons(newBlock);
@@ -135,6 +132,32 @@ async function applyChanges(event) {
   return false;
 }
 
+function handleSelection(event) {
+  const { detail } = event;
+  const resource = detail?.resource;
+
+  if (resource) {
+    const element = document.querySelector(`[data-aue-resource="${resource}"]`);
+    const block = element.parentElement?.closest('.block[data-aue-resource]')
+      || element?.closest('.block[data-aue-resource]');
+
+    if (block && block.matches('.accordion')) {
+      // close all details
+      const details = element.matches('details') ? element : element.querySelector('details');
+      setState(block, [details.dataset.aueResource]);
+    }
+
+    if (block && block.matches('.carousel')) {
+      const slideIndex = [...block.querySelectorAll('.carousel-slide')].findIndex((slide) => slide === element);
+      setState(block, slideIndex);
+    }
+
+    if (block && block.matches('.tabs')) {
+      setState(block, element.dataset.aueResource);
+    }
+  }
+}
+
 function attachEventListners(main) {
   [
     'aue:content-patch',
@@ -148,6 +171,16 @@ function attachEventListners(main) {
     const applied = await applyChanges(event);
     if (!applied) window.location.reload();
   }));
+
+  main?.addEventListener('aue:ui-select', handleSelection);
 }
 
 attachEventListners(document.querySelector('main'));
+
+// decorate rich text
+// this has to happen after decorateMain(), and everythime decorateBlocks() is called
+decorateRichtext();
+// in cases where the block decoration is not done in one synchronous iteration we need to listen
+// for new richtext-instrumented elements. this happens for example when using experimentation.
+const observer = new MutationObserver(() => decorateRichtext());
+observer.observe(document, { attributeFilter: ['data-richtext-prop'], subtree: true });
