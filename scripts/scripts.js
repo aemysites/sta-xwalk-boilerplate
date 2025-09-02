@@ -3,10 +3,10 @@ import {
   loadFooter,
   decorateButtons,
   decorateIcons,
-  decorateLinkedPictures,
   decorateSections,
   decorateBlocks,
   decorateTemplateAndTheme,
+  getMetadata,
   waitForFirstImage,
   loadSection,
   loadSections,
@@ -26,7 +26,7 @@ export function moveAttributes(from, to, attributes) {
   attributes.forEach((attr) => {
     const value = from.getAttribute(attr);
     if (value) {
-      to.setAttribute(attr, value);
+      to?.setAttribute(attr, value);
       from.removeAttribute(attr);
     }
   });
@@ -59,6 +59,17 @@ async function loadFonts() {
   }
 }
 
+function autolinkModals(doc) {
+  doc.addEventListener('click', async (e) => {
+    const origin = e.target.closest('a');
+    if (origin && origin.href && origin.href.includes('/modals/')) {
+      e.preventDefault();
+      const { openModal } = await import(`${window.hlx.codeBasePath}/blocks/modal/modal.js`);
+      openModal(origin.href);
+    }
+  });
+}
+
 /**
  * Builds all synthetic blocks in a container element.
  * @param {Element} main The container element
@@ -72,6 +83,18 @@ function buildAutoBlocks() {
   }
 }
 
+function a11yLinks(main) {
+  const links = main.querySelectorAll('a');
+  links.forEach((link) => {
+    let label = link.textContent;
+    if (!label && link.querySelector('span.icon')) {
+      const icon = link.querySelector('span.icon');
+      label = icon ? icon.classList[1]?.split('-')[1] : label;
+    }
+    link.setAttribute('aria-label', label);
+  });
+}
+
 /**
  * Decorates the main element.
  * @param {Element} main The main element
@@ -81,10 +104,11 @@ export function decorateMain(main) {
   // hopefully forward compatible button decoration
   decorateButtons(main);
   decorateIcons(main);
-  decorateLinkedPictures(main);
   buildAutoBlocks(main);
   decorateSections(main);
   decorateBlocks(main);
+  // add aria-label to links
+  a11yLinks(main);
 }
 
 /**
@@ -94,6 +118,9 @@ export function decorateMain(main) {
 async function loadEager(doc) {
   document.documentElement.lang = 'en';
   decorateTemplateAndTheme();
+  if (getMetadata('breadcrumbs').toLowerCase() === 'true') {
+    doc.body.dataset.breadcrumbs = true;
+  }
   const main = doc.querySelector('main');
   if (main) {
     decorateMain(main);
@@ -116,6 +143,8 @@ async function loadEager(doc) {
  * @param {Element} doc The container element
  */
 async function loadLazy(doc) {
+  autolinkModals(doc);
+
   const main = doc.querySelector('main');
   await loadSections(main);
 
@@ -147,19 +176,3 @@ async function loadPage() {
 }
 
 loadPage();
-
-const { searchParams, origin } = new URL(window.location.href);
-const branch = searchParams.get('nx') || 'main';
-
-export const NX_ORIGIN = branch === 'local' || origin.includes('localhost') ? 'http://localhost:6456/nx' : 'https://da.live/nx';
-
-(async function loadDa() {
-  /* eslint-disable import/no-unresolved */
-  if (searchParams.get('dapreview')) {
-    import('https://da.live/scripts/dapreview.js')
-      .then(({ default: daPreview }) => daPreview(loadPage));
-  }
-  if (searchParams.get('daexperiment')) {
-    import(`${NX_ORIGIN}/public/plugins/exp/exp.js`);
-  }
-}());
